@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
+import { fetchAiQuiz } from '../lib/quiz'
 import { PageHeader, EmptyState, Skeleton, Chip } from '../components/ui'
 import { fadeUp, scaleIn } from '../lib/motion'
 
@@ -56,12 +57,25 @@ export default function ModulePage() {
   async function loadQuiz() {
     setBusy(true)
     setResult(null)
-    const { data, error: err } = await supabase.rpc('get_module_quiz', { p_item_id: itemId })
-    setBusy(false)
-    if (err) return setError(err.message)
-    setQuiz(data)
-    setAnswers({})
-    setTab('quiz')
+    setError('')
+    try {
+      const level = 3
+      const { questions } = await fetchAiQuiz({
+        skillIds: item?.skill_id ? [item.skill_id] : [],
+        count: 5,
+        difficulty: level,
+        mode: 'module',
+        topicHint: item?.skills?.name || '',
+      })
+      if (!questions.length) throw new Error('Could not generate module quiz')
+      setQuiz({ questions, pass_percent: 70, skill_name: item?.skills?.name })
+      setAnswers({})
+      setTab('quiz')
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function submitQuiz() {

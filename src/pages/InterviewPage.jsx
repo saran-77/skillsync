@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAiQuiz } from '../lib/quiz'
+import { useAuth } from '../context/AuthContext'
 import { PageHeader, EmptyState } from '../components/ui'
 
 const LIMIT_SECONDS = 10 * 60
 
 export default function InterviewPage() {
+  const { profile } = useAuth()
   const [questions, setQuestions] = useState([])
   const [idx, setIdx] = useState(0)
   const [selected, setSelected] = useState(null)
@@ -14,18 +17,29 @@ export default function InterviewPage() {
   const [left, setLeft] = useState(LIMIT_SECONDS)
   const [result, setResult] = useState(null)
   const [startedAt] = useState(Date.now())
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase.rpc('get_assessment_questions', {
-      p_skill_id: null,
-      p_difficulty: 3,
-      p_limit: 10,
-      p_mode: 'interview',
-    }).then(({ data }) => setQuestions(data || []))
-  }, [])
+    async function load() {
+      try {
+        const focus = profile?.focus_skill_ids
+        const { questions: qs } = await fetchAiQuiz({
+          skillIds: Array.isArray(focus) && focus.length ? focus : [],
+          count: 10,
+          difficulty: 3,
+          mode: 'interview',
+          roleTitle: profile?.roles?.title || '',
+        })
+        setQuestions(qs)
+      } catch (e) {
+        setError(e.message)
+      }
+    }
+    load()
+  }, [profile?.focus_skill_ids, profile?.roles?.title])
 
   useEffect(() => {
-    if (result) return undefined
+    if (result || !questions.length) return undefined
     const id = setInterval(() => {
       setLeft((s) => {
         if (s <= 1) {
@@ -53,13 +67,13 @@ export default function InterviewPage() {
       setResult({ score: 0, level: 'Beginner', correct: 0, total: 0, recommendation: 'Time expired with no answers.' })
       return
     }
-    const { data, error } = await supabase.rpc('submit_assessment', {
+    const { data, error: err } = await supabase.rpc('submit_assessment', {
       p_mode: 'interview',
       p_answers: payload,
       p_time_taken: (Date.now() - startedAt) / 1000,
       p_topic: 'interview',
     })
-    if (error) alert(error.message)
+    if (err) alert(err.message)
     else setResult(data)
   }
 
@@ -84,7 +98,8 @@ export default function InterviewPage() {
     )
   }
 
-  if (!q) return <p className="text-white/50">Preparing interview set…</p>
+  if (error) return <EmptyState title="Interview unavailable" body={error} />
+  if (!q) return <p className="text-white/50">Generating AI interview set…</p>
 
   const mm = String(Math.floor(left / 60)).padStart(2, '0')
   const ss = String(left % 60).padStart(2, '0')
@@ -93,7 +108,7 @@ export default function InterviewPage() {
     <div>
       <PageHeader
         title="Interview mode"
-        subtitle="Timed mock quiz — same curated bank, no adaptive difficulty."
+        subtitle="Timed mock quiz — fresh AI questions for your focus skills."
         action={<span className={`rounded-xl px-3 py-2 font-mono text-lg ${left < 60 ? 'bg-red-500/20 text-red-200' : 'bg-white/10'}`}>{mm}:{ss}</span>}
       />
       <motion.div className="panel mx-auto max-w-2xl p-6" key={q.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

@@ -36,8 +36,8 @@ export async function requireUser(req: Request) {
   return { user, authHeader, supabase }
 }
 
-const DAILY_LIMIT = 30
-const MINUTE_LIMIT = 5
+const DAILY_LIMIT = 80
+const MINUTE_LIMIT = 15
 
 export async function checkRateLimits(service: ReturnType<typeof createServiceClient>, userId: string) {
   const sinceDay = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -126,6 +126,7 @@ export async function callGroq(opts: {
   max_tokens: number
   stream?: boolean
   json?: boolean
+  temperature?: number
 }) {
   const key = Deno.env.get('GROQ_API_KEY')
   if (!key) throw new Error('GROQ_API_KEY missing')
@@ -134,7 +135,7 @@ export async function callGroq(opts: {
     model: opts.model,
     messages: opts.messages,
     max_tokens: opts.max_tokens,
-    temperature: 0.4,
+    temperature: opts.temperature ?? 0.4,
     stream: !!opts.stream,
   }
   if (opts.json) {

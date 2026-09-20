@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { supabase, invokeFunction } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
+import { fetchAiQuiz } from '../lib/quiz'
 import { useAuth } from '../context/AuthContext'
 
 const LEARNER_TYPES = [
@@ -116,10 +117,14 @@ export default function OnboardingPage() {
           updated_at: new Date().toISOString(),
         }).eq('id', user.id)
 
-        const data = await invokeFunction('onboarding-placement-quiz', {
-          role_id: roleId,
-          skill_ids: focusSkills,
-          experience_level: level,
+        const levelMap = { beginner: 2, intermediate: 3, advanced: 4, pro: 5 }
+        const role = roles.find((r) => r.id === roleId)
+        const data = await fetchAiQuiz({
+          skillIds: focusSkills,
+          count: 5,
+          difficulty: levelMap[level] || 3,
+          mode: 'onboarding',
+          roleTitle: role?.title || '',
         })
         setQuiz(data.questions || [])
         setAnswers({})

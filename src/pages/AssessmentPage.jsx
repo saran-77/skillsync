@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { supabase, invokeFunction } from '../lib/supabase'
+import { fetchAiQuiz } from '../lib/quiz'
+import { useAuth } from '../context/AuthContext'
 import { PageHeader, Chip } from '../components/ui'
 import { scaleIn } from '../lib/motion'
 
 export default function AssessmentPage() {
+  const { profile } = useAuth()
   const [difficulty, setDifficulty] = useState(3)
   const [question, setQuestion] = useState(null)
   const [answers, setAnswers] = useState([])
@@ -18,24 +21,32 @@ export default function AssessmentPage() {
   const [hint, setHint] = useState('')
   const total = 8
 
+  const skillIds = useMemo(() => {
+    const focus = profile?.focus_skill_ids
+    return Array.isArray(focus) && focus.length ? focus : []
+  }, [profile?.focus_skill_ids])
+
   async function loadQuestion(diff, excludeIds) {
     setBusy(true)
     setSelected(null)
     setHint('')
     const exclude = excludeIds ?? answers.map((a) => a.question_id)
-    const { data, error } = await supabase.rpc('get_assessment_questions', {
-      p_skill_id: null,
-      p_difficulty: diff,
-      p_limit: 1,
-      p_mode: 'adaptive',
-      p_exclude: exclude,
-    })
-    setBusy(false)
-    if (error) {
-      console.error(error)
-      return
+    try {
+      const { questions } = await fetchAiQuiz({
+        skillIds,
+        count: 1,
+        difficulty: diff,
+        mode: 'adaptive',
+        excludeIds: exclude,
+        roleTitle: profile?.roles?.title || '',
+      })
+      setQuestion(questions[0] || null)
+    } catch (e) {
+      console.error(e)
+      setQuestion(null)
+    } finally {
+      setBusy(false)
     }
-    setQuestion(data?.[0] || null)
   }
 
   useEffect(() => {
@@ -77,12 +88,10 @@ export default function AssessmentPage() {
       return
     }
 
-    // Adaptive 2.0: difficulty from recent event window (and tentative client streak via last answers)
     const { data: nextDiff } = await supabase.rpc('get_next_difficulty', {
       p_skill_id: question.skill_id || null,
     })
     let d = nextDiff || difficulty
-    // Mid-assessment nudge before events are written: use confidence as soft signal
     if (confidence >= 5) d = Math.min(5, d + 1)
     if (confidence <= 1) d = Math.max(1, d - 1)
     setDifficulty(d)
@@ -126,64 +135,54 @@ export default function AssessmentPage() {
     <div>
       <PageHeader
         title="Adaptive assessment"
-        subtitle={`Question ${step + 1} of ${total} · difficulty ${difficulty}`}
+        subtitle="Fresh AI questions each step — difficulty adjusts as you answer."
+        action={<Chip tone="sand">Q {step + 1}/{total} · d{difficulty}</Chip>}
       />
       <AnimatePresence mode="wait">
-        {question && (
+        {question ? (
           <motion.div
             key={question.id}
-            className="panel mx-auto max-w-2xl p-6 md:p-8"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.25 }}
+            className="panel mx-auto max-w-2xl p-6"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
           >
-            <div className="mb-4 flex flex-wrap gap-2">
-              <Chip tone="tide">Difficulty {difficulty}</Chip>
-              {question.concept && (
-                <Chip tone="sand">
-                  {String(question.stem || '').startsWith('Scenario:') ? 'Scenario · ' : ''}
-                  {String(question.concept).replace(/-/g, ' ')}
-                </Chip>
-              )}
-            </div>
-            <p className="text-lg leading-relaxed">{question.stem}</p>
-            <div className="mt-6 space-y-3">
-              {options.map((opt, idx) => (
-                <motion.button
-                  key={idx}
+            <p className="text-lg">{question.stem}</p>
+            <div className="mt-5 space-y-2">
+              {options.map((opt, i) => (
+                <button
+                  key={i}
                   type="button"
-                  onClick={() => setSelected(idx)}
-                  whileTap={{ scale: 0.99 }}
-                  animate={selected === idx ? { scale: 1.01 } : { scale: 1 }}
-                  className={`w-full rounded-xl border px-4 py-3 text-left transition ${
-                    selected === idx ? 'border-tideBright bg-tideBright/15' : 'border-white/10 bg-white/5 hover:border-white/25'
-                  }`}
+                  className={`w-full rounded-xl border px-4 py-3 text-left ${selected === i ? 'border-tideBright bg-tideBright/15' : 'border-white/10 bg-white/5'}`}
+                  onClick={() => setSelected(i)}
                 >
                   {opt}
-                </motion.button>
+                </button>
               ))}
             </div>
-            <label className="label mt-6">Confidence: {confidence}</label>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              value={confidence}
-              onChange={(e) => setConfidence(Number(e.target.value))}
-              className="w-full accent-tideBright"
-            />
-            {hint && <p className="mt-4 rounded-xl bg-white/5 p-3 text-sm text-sand">{hint}</p>}
+            <div className="mt-5">
+              <label className="label">Confidence {confidence}/5</label>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={confidence}
+                onChange={(e) => setConfidence(Number(e.target.value))}
+                className="w-full accent-tideBright"
+              />
+            </div>
             <div className="mt-6 flex flex-wrap gap-3">
-              <button type="button" className="btn-ghost" onClick={askHint}>Hint from tutor</button>
+              <button type="button" className="btn-ghost" onClick={askHint}>Hint</button>
               <button type="button" className="btn-primary ml-auto" disabled={selected == null || busy} onClick={next}>
-                {step + 1 >= total ? 'Submit' : 'Next'}
+                {busy ? 'Loading…' : step + 1 >= total ? 'Submit' : 'Next'}
               </button>
             </div>
+            {hint && <p className="mt-4 text-sm text-white/55">{hint}</p>}
           </motion.div>
+        ) : (
+          <p className="text-center text-white/50">{busy ? 'Generating AI question…' : 'No question available. Try again.'}</p>
         )}
       </AnimatePresence>
-      {!question && !busy && <p className="text-white/50">No questions available. Seed the database.</p>}
     </div>
   )
 }

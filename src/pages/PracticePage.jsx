@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { supabase, invokeFunction } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
+import { fetchAiQuiz } from '../lib/quiz'
 import { PageHeader } from '../components/ui'
 
 export default function PracticePage() {
@@ -31,11 +32,15 @@ export default function PracticePage() {
     setResult(null)
     setSelected(null)
     try {
-      const data = await invokeFunction('generate-practice-question', {
-        skill_id: skillId,
+      const { questions } = await fetchAiQuiz({
+        skillIds: skillId ? [skillId] : [],
+        count: 1,
         difficulty,
+        mode: 'adaptive',
+        topicHint: 'practice drill',
       })
-      setQuestion(data.question)
+      setQuestion(questions[0] || null)
+      if (!questions[0]) setError('No question generated')
     } catch (e) {
       setError(e.message)
     } finally {
@@ -59,7 +64,7 @@ export default function PracticePage() {
 
   return (
     <div>
-      <PageHeader title="Practice (AI)" subtitle="Generated questions are practice-only and not used in scored adaptive assessments until reviewed." />
+      <PageHeader title="Practice (AI)" subtitle="Each generate call creates a new AI question for the skill you pick." />
       <div className="panel mb-6 grid gap-3 p-4 md:grid-cols-3">
         <div>
           <label className="label">Skill</label>

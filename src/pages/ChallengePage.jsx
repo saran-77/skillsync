@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAiQuiz } from '../lib/quiz'
+import { useAuth } from '../context/AuthContext'
 import { PageHeader, EmptyState } from '../components/ui'
 
 export default function ChallengePage() {
+  const { profile } = useAuth()
   const [done, setDone] = useState(false)
   const [questions, setQuestions] = useState([])
   const [idx, setIdx] = useState(0)
@@ -12,6 +15,7 @@ export default function ChallengePage() {
   const [answers, setAnswers] = useState([])
   const [result, setResult] = useState(null)
   const [startedAt] = useState(Date.now())
+  const [error, setError] = useState('')
 
   useEffect(() => {
     async function init() {
@@ -23,16 +27,22 @@ export default function ChallengePage() {
         setResult({ score: existing.score })
         return
       }
-      const { data } = await supabase.rpc('get_assessment_questions', {
-        p_skill_id: null,
-        p_difficulty: 3,
-        p_limit: 5,
-        p_mode: 'interview',
-      })
-      setQuestions(data || [])
+      try {
+        const focus = profile?.focus_skill_ids
+        const { questions: qs } = await fetchAiQuiz({
+          skillIds: Array.isArray(focus) && focus.length ? focus : [],
+          count: 5,
+          difficulty: 3,
+          mode: 'daily',
+          roleTitle: profile?.roles?.title || '',
+        })
+        setQuestions(qs)
+      } catch (e) {
+        setError(e.message)
+      }
     }
     init()
-  }, [])
+  }, [profile?.focus_skill_ids, profile?.roles?.title])
 
   const q = questions[idx]
   const options = useMemo(() => {
@@ -45,11 +55,11 @@ export default function ChallengePage() {
     const nextAnswers = [...answers, { question_id: q.id, selected_index: selected, confidence: 3 }]
     setAnswers(nextAnswers)
     if (idx + 1 >= questions.length) {
-      const { data, error } = await supabase.rpc('complete_daily_challenge', {
+      const { data, error: err } = await supabase.rpc('complete_daily_challenge', {
         p_answers: nextAnswers,
         p_time_taken: (Date.now() - startedAt) / 1000,
       })
-      if (error) return alert(error.message)
+      if (err) return alert(err.message)
       setResult(data)
       setDone(true)
       return
@@ -68,11 +78,12 @@ export default function ChallengePage() {
     )
   }
 
-  if (!q) return <p className="text-white/50">Loading challenge…</p>
+  if (error) return <EmptyState title="Challenge unavailable" body={error} />
+  if (!q) return <p className="text-white/50">Generating today&apos;s AI challenge…</p>
 
   return (
     <div>
-      <PageHeader title="Daily challenge" subtitle={`${idx + 1} / ${questions.length}`} />
+      <PageHeader title="Daily challenge" subtitle={`${idx + 1} / ${questions.length} · AI-generated`} />
       <motion.div className="panel mx-auto max-w-2xl p-6" key={q.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <p className="text-lg">{q.stem}</p>
         <div className="mt-5 space-y-2">
