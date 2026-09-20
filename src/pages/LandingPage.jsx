@@ -63,13 +63,21 @@ export default function LandingPage() {
         >
           {[
             ['Assess', 'Adaptive quizzes with server-side scoring'],
-            ['Path', 'Prioritized skills matched to your role'],
-            ['Tutor', 'Fast Groq hints when you get stuck'],
-          ].map(([t, d]) => (
-            <div key={t} className="panel p-5">
+            ['Path', 'Modules with open docs, courses, and repos'],
+            ['DNA', 'Evidence-backed mastery — not vanity scores'],
+          ].map(([t, d], i) => (
+            <motion.div
+              key={t}
+              className="panel p-5"
+              whileHover={{ y: -4 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              custom={i}
+            >
               <h3 className="font-display text-lg font-semibold text-tideBright">{t}</h3>
               <p className="mt-2 text-sm text-white/55">{d}</p>
-            </div>
+            </motion.div>
           ))}
         </motion.div>
       </div>

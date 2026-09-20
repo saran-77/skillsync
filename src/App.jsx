@@ -17,6 +17,7 @@ import InterviewPage from './pages/InterviewPage'
 import TutorPage from './pages/TutorPage'
 import ProfilePage from './pages/ProfilePage'
 import PracticePage from './pages/PracticePage'
+import SkillDnaPage from './pages/SkillDnaPage'
 
 function PublicOnly({ children }) {
   const { session, loading } = useAuth()
@@ -36,6 +37,7 @@ function AnimatedRoutes() {
         <Route path="/onboarding" element={<ProtectedRoute requireOnboarding={false}><OnboardingPage /></ProtectedRoute>} />
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/dna" element={<SkillDnaPage />} />
           <Route path="/assessment" element={<AssessmentPage />} />
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/path" element={<PathPage />} />

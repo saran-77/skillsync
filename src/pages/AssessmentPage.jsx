@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { supabase, invokeFunction } from '../lib/supabase'
-import { PageHeader } from '../components/ui'
+import { PageHeader, Chip } from '../components/ui'
+import { scaleIn } from '../lib/motion'
 
 export default function AssessmentPage() {
   const [difficulty, setDifficulty] = useState(3)
@@ -36,7 +37,13 @@ export default function AssessmentPage() {
   }
 
   useEffect(() => {
-    loadQuestion(difficulty)
+    async function boot() {
+      const { data: nextDiff } = await supabase.rpc('get_next_difficulty', { p_skill_id: null })
+      const d = nextDiff || 3
+      setDifficulty(d)
+      await loadQuestion(d)
+    }
+    boot()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -54,11 +61,6 @@ export default function AssessmentPage() {
     }]
     setAnswers(nextAnswers)
 
-    // Adaptive: we don't know correctness client-side; nudge difficulty gently by confidence + mid bias
-    // Real adapt happens after score; mid-session we vary difficulty around current band.
-    const nextDiff = Math.max(1, Math.min(5, difficulty + (confidence >= 4 ? 1 : confidence <= 2 ? -1 : 0)))
-    setDifficulty(nextDiff)
-
     if (step + 1 >= total) {
       setBusy(true)
       const { data, error } = await supabase.rpc('submit_assessment', {
@@ -72,8 +74,18 @@ export default function AssessmentPage() {
       setResult(data)
       return
     }
+
+    // Adaptive 2.0: difficulty from recent event window (and tentative client streak via last answers)
+    const { data: nextDiff } = await supabase.rpc('get_next_difficulty', {
+      p_skill_id: question.skill_id || null,
+    })
+    let d = nextDiff || difficulty
+    // Mid-assessment nudge before events are written: use confidence as soft signal
+    if (confidence >= 5) d = Math.min(5, d + 1)
+    if (confidence <= 1) d = Math.max(1, d - 1)
+    setDifficulty(d)
     setStep(step + 1)
-    await loadQuestion(nextDiff)
+    await loadQuestion(d)
   }
 
   async function askHint() {
@@ -93,13 +105,14 @@ export default function AssessmentPage() {
 
   if (result) {
     return (
-      <motion.div className="panel mx-auto max-w-xl p-8 text-center" initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+      <motion.div className="panel mx-auto max-w-xl p-8 text-center" {...scaleIn}>
         <h2 className="font-display text-3xl font-bold">Assessment complete</h2>
         <p className="mt-4 text-5xl font-extrabold text-tideBright">{result.score}<span className="text-lg text-white/50">/10</span></p>
         <p className="mt-2 text-white/60">{result.level} · {result.correct}/{result.total} correct</p>
         <p className="mt-4 text-sm text-white/55">{result.recommendation}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link className="btn-primary" to="/gaps">See gaps</Link>
+          <Link className="btn-primary" to="/dna">View Skill DNA</Link>
+          <Link className="btn-ghost" to="/gaps">See gaps</Link>
           <Link className="btn-ghost" to="/path">Build path</Link>
           <Link className="btn-ghost" to="/flashcards">Review misses</Link>
         </div>
@@ -123,19 +136,30 @@ export default function AssessmentPage() {
             exit={{ opacity: 0, x: -24 }}
             transition={{ duration: 0.25 }}
           >
+            <div className="mb-4 flex flex-wrap gap-2">
+              <Chip tone="tide">Difficulty {difficulty}</Chip>
+              {question.concept && (
+                <Chip tone="sand">
+                  {String(question.stem || '').startsWith('Scenario:') ? 'Scenario · ' : ''}
+                  {String(question.concept).replace(/-/g, ' ')}
+                </Chip>
+              )}
+            </div>
             <p className="text-lg leading-relaxed">{question.stem}</p>
             <div className="mt-6 space-y-3">
               {options.map((opt, idx) => (
-                <button
+                <motion.button
                   key={idx}
                   type="button"
                   onClick={() => setSelected(idx)}
+                  whileTap={{ scale: 0.99 }}
+                  animate={selected === idx ? { scale: 1.01 } : { scale: 1 }}
                   className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                     selected === idx ? 'border-tideBright bg-tideBright/15' : 'border-white/10 bg-white/5 hover:border-white/25'
                   }`}
                 >
                   {opt}
-                </button>
+                </motion.button>
               ))}
             </div>
             <label className="label mt-6">Confidence: {confidence}</label>
