@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SkillSync AI
 
 Adaptive learning platform for students: assess skills, close gaps for a target role, follow a learning path, and chat with an AI tutor.
@@ -82,3 +83,6 @@ src/                 React app (pages, auth, supabase client)
 supabase/migrations Schema, RLS, RPCs, seed catalog
 supabase/functions   ai-tutor, generate-practice-question
 ```
+=======
+# skillsync
+>>>>>>> 24222100cdbd5aeaa4df9a20159469ffc9f5a85a
