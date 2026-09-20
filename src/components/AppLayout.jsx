@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 
@@ -13,6 +13,15 @@ const primary = [
 ]
 
 const more = [
+  { to: '/challenge', label: 'Daily Challenge' },
+  { to: '/flashcards', label: 'Flashcards' },
+  { to: '/interview', label: 'Interview' },
+  { to: '/practice', label: 'Practice' },
+  { to: '/profile', label: 'Profile' },
+]
+
+const allMobile = [
+  ...primary,
   { to: '/challenge', label: 'Daily' },
   { to: '/flashcards', label: 'Cards' },
   { to: '/interview', label: 'Interview' },
@@ -20,21 +29,32 @@ const more = [
   { to: '/profile', label: 'Profile' },
 ]
 
-const allMobile = [...primary, ...more]
-
 export default function AppLayout() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
+  const moreActive = more.some((l) => location.pathname === l.to || location.pathname.startsWith(`${l.to}/`))
 
   useEffect(() => {
     function onDoc(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false)
     }
+    function onKey(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [])
+
+  useEffect(() => {
+    setOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="min-h-screen">
@@ -58,29 +78,38 @@ export default function AppLayout() {
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
-                className="rounded-lg px-2.5 py-1.5 text-sm text-white/55 hover:text-mist"
+                aria-expanded={open}
+                aria-haspopup="menu"
+                className={`rounded-lg px-2.5 py-1.5 text-sm transition ${
+                  moreActive || open ? 'bg-white/10 text-mist' : 'text-white/55 hover:text-mist'
+                }`}
                 onClick={() => setOpen((v) => !v)}
               >
-                More
+                More{moreActive ? ' ·' : ''}
               </button>
               <AnimatePresence>
                 {open && (
                   <motion.div
+                    role="menu"
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 4 }}
-                    className="absolute right-0 mt-2 min-w-[10rem] rounded-xl border border-white/10 bg-dusk/95 p-1 shadow-glow backdrop-blur-md"
+                    className="absolute right-0 mt-2 min-w-[12.5rem] rounded-xl border border-white/10 bg-dusk/95 p-1.5 shadow-glow backdrop-blur-md"
                   >
                     {more.map((l) => (
                       <NavLink
                         key={l.to}
                         to={l.to}
+                        role="menuitem"
                         onClick={() => setOpen(false)}
                         className={({ isActive }) =>
-                          `block rounded-lg px-3 py-2 text-sm ${isActive ? 'bg-white/10 text-mist' : 'text-white/65 hover:bg-white/5'}`
+                          `flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
+                            isActive ? 'bg-white/10 text-mist' : 'text-white/65 hover:bg-white/5'
+                          }`
                         }
                       >
-                        {l.label}
+                        <span>{l.label}</span>
+                        {location.pathname === l.to && <span className="text-xs text-tideBright">●</span>}
                       </NavLink>
                     ))}
                   </motion.div>
@@ -99,7 +128,13 @@ export default function AppLayout() {
         </div>
         <div className="flex gap-1 overflow-x-auto px-3 pb-2 md:hidden">
           {allMobile.map((l) => (
-            <NavLink key={l.to} to={l.to} className="shrink-0 rounded-lg bg-white/5 px-2.5 py-1 text-xs text-white/70">
+            <NavLink
+              key={l.to}
+              to={l.to}
+              className={({ isActive }) =>
+                `shrink-0 rounded-lg px-2.5 py-1 text-xs ${isActive ? 'bg-white/15 text-mist' : 'bg-white/5 text-white/70'}`
+              }
+            >
               {l.label}
             </NavLink>
           ))}

@@ -18,15 +18,17 @@ export default function AssessmentPage() {
   const [hint, setHint] = useState('')
   const total = 8
 
-  async function loadQuestion(diff) {
+  async function loadQuestion(diff, excludeIds) {
     setBusy(true)
     setSelected(null)
     setHint('')
+    const exclude = excludeIds ?? answers.map((a) => a.question_id)
     const { data, error } = await supabase.rpc('get_assessment_questions', {
       p_skill_id: null,
       p_difficulty: diff,
       p_limit: 1,
       p_mode: 'adaptive',
+      p_exclude: exclude,
     })
     setBusy(false)
     if (error) {
@@ -85,7 +87,7 @@ export default function AssessmentPage() {
     if (confidence <= 1) d = Math.max(1, d - 1)
     setDifficulty(d)
     setStep(step + 1)
-    await loadQuestion(d)
+    await loadQuestion(d, nextAnswers.map((a) => a.question_id))
   }
 
   async function askHint() {
