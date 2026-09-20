@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --ink: #0c1222;
+  --mist: #e8eef8;
+  --tide: #1a6b5c;
+  --tide-bright: #2a9d8f;
+  --sand: #f0a05a;
+  --dusk: #1e2a44;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--ink);
+  color: var(--mist);
+  background-image: theme('backgroundImage.mesh');
+  background-attachment: fixed;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-white/10 bg-dusk/60 backdrop-blur-md;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-tideBright/60 disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-tideBright text-ink hover:bg-tide;
+  }
+  .btn-ghost {
+    @apply btn bg-white/5 text-mist hover:bg-white/10;
+  }
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-ink/50 px-3 py-2.5 text-mist placeholder:text-white/35 focus:border-tideBright/50 focus:outline-none;
+  }
+  .label {
+    @apply mb-1.5 block text-sm text-white/70;
+  }
+}
