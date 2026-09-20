@@ -18,6 +18,7 @@ import TutorPage from './pages/TutorPage'
 import ProfilePage from './pages/ProfilePage'
 import PracticePage from './pages/PracticePage'
 import SkillDnaPage from './pages/SkillDnaPage'
+import ModulePage from './pages/ModulePage'
 
 function PublicOnly({ children }) {
   const { session, loading } = useAuth()
@@ -41,6 +42,7 @@ function AnimatedRoutes() {
           <Route path="/assessment" element={<AssessmentPage />} />
           <Route path="/gaps" element={<GapsPage />} />
           <Route path="/path" element={<PathPage />} />
+          <Route path="/path/:itemId" element={<ModulePage />} />
           <Route path="/challenge" element={<ChallengePage />} />
           <Route path="/flashcards" element={<FlashcardsPage />} />
           <Route path="/interview" element={<InterviewPage />} />

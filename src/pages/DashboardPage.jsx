@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const [mission, setMission] = useState(null)
   const [gapStats, setGapStats] = useState({ total: 0, critical: 0 })
   const [chart, setChart] = useState('radar')
+  const [moduleProgress, setModuleProgress] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,17 +30,20 @@ export default function DashboardPage() {
         { data: assessments },
         { data: missionData },
         gapsRes,
+        { data: modProg },
       ] = await Promise.all([
         supabase.rpc('get_skill_dna'),
         supabase.from('assessments').select('id, score, level, mode, completed_at').eq('user_id', user.id).order('completed_at', { ascending: false }).limit(8),
         supabase.rpc('get_todays_mission'),
         supabase.rpc('compute_gaps'),
+        supabase.rpc('get_module_progress'),
       ])
       if (cancelled) return
       const skillRows = dna?.skills || []
       setSkills(skillRows.map((r) => ({ skill: r.skill_name || 'Skill', value: Number(r.mastery_score) || 0 })))
       setHistory(assessments || [])
       setMission(missionData)
+      setModuleProgress(modProg)
       const gapList = gapsRes.error ? [] : (gapsRes.data || [])
       setGapStats({
         total: gapList.filter((g) => Number(g.gap) > 0.5).length,
@@ -69,12 +73,74 @@ export default function DashboardPage() {
         <Link to="/dna" className="btn-primary">Open Skill DNA</Link>
       </div>
 
+      {moduleProgress?.has_path && (
+        <motion.section className="panel p-5" {...fadeUp}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-sand">Path progress</p>
+              <h2 className="font-display mt-1 text-2xl font-bold">
+                {moduleProgress.completed}/{moduleProgress.total} modules passed
+              </h2>
+              {moduleProgress.current ? (
+                <p className="mt-2 text-sm text-white/55">
+                  Continue: <span className="text-mist">{moduleProgress.current.skill_name}</span>
+                  {moduleProgress.current.attempts ? ` · ${moduleProgress.current.attempts} attempt(s)` : ''}
+                  {moduleProgress.current.best_score != null ? ` · best ${Math.round(moduleProgress.current.best_score)}%` : ''}
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-tideBright">All modules completed for this path.</p>
+              )}
+            </div>
+            {moduleProgress.current ? (
+              <Link className="btn-primary" to={`/path/${moduleProgress.current.id}`}>Continue module</Link>
+            ) : (
+              <Link className="btn-ghost" to="/path">View path</Link>
+            )}
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-sand"
+              style={{ width: `${moduleProgress.total ? (moduleProgress.completed / moduleProgress.total) * 100 : 0}%` }}
+            />
+          </div>
+
+          {Array.isArray(moduleProgress.recent_attempts) && moduleProgress.recent_attempts.some((a) => !a.passed) && (
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <h3 className="text-sm font-medium text-white/70">Recent module mistakes</h3>
+              <ul className="mt-2 space-y-2">
+                {moduleProgress.recent_attempts.filter((a) => !a.passed).slice(0, 3).map((a) => (
+                  <li key={a.id} className="rounded-xl bg-ink/40 px-3 py-2 text-sm">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <span>{a.skill_name}</span>
+                      <span className="text-sand">{Math.round(a.score)}% — retry</span>
+                    </div>
+                    {(a.misses || []).slice(0, 2).map((m, idx) => (
+                      <p key={idx} className="mt-1 truncate text-xs text-white/45">{m.stem}</p>
+                    ))}
+                    <Link className="mt-2 inline-block text-xs text-tideBright" to={`/path/${a.path_item_id}`}>Open module →</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </motion.section>
+      )}
+
       {mission && (
         <motion.section className="panel border border-tideBright/20 bg-gradient-to-br from-tideBright/10 to-transparent p-5 md:p-6" {...fadeUp}>
           <p className="text-xs uppercase tracking-[0.18em] text-tideBright">Today&apos;s Mission</p>
           <h2 className="font-display mt-2 text-2xl font-bold">~{mission.total_minutes || 0} focused minutes</h2>
           <p className="mt-1 text-sm text-white/50">One clear plan — revise, practice, then verify.</p>
           <ol className="mt-5 space-y-2">
+            {moduleProgress?.current && (
+              <li className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sand/20 bg-sand/10 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-medium">Continue {moduleProgress.current.skill_name}</p>
+                  <p className="text-sm text-white/45">Study + pass the module quiz to unlock the next step.</p>
+                </div>
+                <Link to={`/path/${moduleProgress.current.id}`} className="btn-primary shrink-0 text-sm">Resume</Link>
+              </li>
+            )}
             {(mission.items || []).map((item, idx) => (
               <li key={idx} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-ink/50 px-4 py-3 transition hover:border-tideBright/30">
                 <div className="min-w-0">
